@@ -7,6 +7,8 @@
     - Card Number (xlsx)          -> project_number (json), en entier.
     - Encounter Set Number (xlsx) -> encounter_number (json), MAIS sans le
       total "/z" : "19-20/27" devient "19-20", "5/27" devient "5".
+    - Copies (xlsx)               -> amount (json), sur CHAQUE carte. Ce champ
+      n'existe actuellement sur aucune carte du json ; il est cree.
 
     L'appariement entre une ligne du xlsx et une carte du json se fait par :
       (nom du set d'encounter, nom de carte normalise, type de face avant)
@@ -48,7 +50,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if (-not $OutputJsonPath) {
-    $dir  = Split-Path -Parent $JsonPath
+    $dir = Split-Path -Parent $JsonPath
     $name = [System.IO.Path]::GetFileNameWithoutExtension($JsonPath)
     $OutputJsonPath = Join-Path $dir "$name`_updated.json"
 }
@@ -67,12 +69,15 @@ $rows = Import-Excel -Path $ExcelPath
 
 Write-Host "Lecture du json : $JsonPath"
 $jsonRaw = Get-Content -Path $JsonPath -Raw -Encoding UTF8
-$data    = $jsonRaw | ConvertFrom-Json -Depth 100
+$data = $jsonRaw | ConvertFrom-Json -Depth 100
+Write-Host "  $($data.cards.Count) carte(s), $($data.encounter_sets.Count) encounter set(s) charges."
 
 # --- Table de correspondance nom de set -> id de set -----------------------
 $setIdByName = @{}
 foreach ($es in $data.encounter_sets) {
-    $setIdByName[$es.name] = $es.id
+    if ($null -ne $es -and -not [string]::IsNullOrWhiteSpace($es.name)) {
+        $setIdByName[$es.name] = $es.id
+    }
 }
 
 function Get-PlainSetName {
@@ -106,50 +111,89 @@ $fallbackTypes = @{
 
 # --- Construit les "pools" de cartes candidates par cle --------------------
 # Cle = "<set_id>|<nom_normalise>|<front_type>" -> file (FIFO) de cartes candidates
+Write-Host "Construction des index de correspondance..."
 $pools = @{}
 foreach ($card in $data.cards) {
-    $ftype = $card.front.type
-    $key = "{0}|{1}|{2}" -f $card.encounter_set, (Get-NormalizedName $card.name), $ftype
+    if ($null -eq $card) { continue }
+    $key = "{0}|{1}|{2}" -f $card.encounter_set, (Get-NormalizedName $card.name), $card.front.type
     if (-not $pools.ContainsKey($key)) {
         $pools[$key] = [System.Collections.Generic.Queue[object]]::new()
     }
     $pools[$key].Enqueue($card)
 }
+Write-Host "  $($pools.Count) cle(s) d'index construite(s)."
 
 # --- Applique la correspondance, ligne par ligne du xlsx (ordre Card Number) -
-$rows = $rows | Sort-Object { [int]$_.'Card Number' }
+# On ignore les lignes vides ("fantomes") qu'Import-Excel peut renvoyer si la
+# plage utilisee de la feuille depasse les donnees reelles.
+$rows = $rows |
+    Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_.'Card Number') -and
+        -not [string]::IsNullOrWhiteSpace($_.'English Card Name') -and
+        -not [string]::IsNullOrWhiteSpace($_.Type)
+    } |
+    Sort-Object { [int]$_.'Card Number' }
 
-$matchedCount   = 0
-$unmatchedRows  = New-Object System.Collections.Generic.List[object]
+Write-Host "$($rows.Count) ligne(s) valide(s) a traiter."
+
+$matchedCount = 0
+$unmatchedRows = New-Object System.Collections.Generic.List[object]
+$rowIndex = 0
 
 foreach ($row in $rows) {
-    $setId  = $setIdByName[(Get-PlainSetName $row.'Encounter Set Name')]
-    $nname  = Get-NormalizedName $row.'English Card Name'
-    $xtype  = $row.Type
-    $tries  = $fallbackTypes[$xtype]
-    if (-not $tries) { $tries = @($xtype) }
+    $rowIndex++
+    try {
+        $plainSet = Get-PlainSetName $row.'Encounter Set Name'
+        $setId = if ($setIdByName.ContainsKey($plainSet)) { $setIdByName[$plainSet] } else { $null }
+        $nname = Get-NormalizedName $row.'English Card Name'
+        $xtype = $row.Type
 
-    $found = $null
-    foreach ($ftype in $tries) {
-        $key = "{0}|{1}|{2}" -f $setId, $nname, $ftype
-        if ($pools.ContainsKey($key) -and $pools[$key].Count -gt 0) {
-            $found = $pools[$key].Dequeue()
-            break
+        $tries = if (-not [string]::IsNullOrWhiteSpace($xtype) -and $fallbackTypes.ContainsKey($xtype)) {
+            $fallbackTypes[$xtype]
+        }
+        else {
+            @($xtype)
+        }
+
+        $found = $null
+        if ($setId) {
+            foreach ($ftype in $tries) {
+                if ([string]::IsNullOrWhiteSpace($ftype)) { continue }
+                $key = "{0}|{1}|{2}" -f $setId, $nname, $ftype
+                if ($pools.ContainsKey($key) -and $pools[$key].Count -gt 0) {
+                    $found = $pools[$key].Dequeue()
+                    break
+                }
+            }
+        }
+
+        if ($found) {
+            # Card Number -> project_number (entier)
+            $found.project_number = [int]$row.'Card Number'
+
+            # Encounter Set Number -> encounter_number, SANS le total "/z"
+            $encSetNumber = [string]$row.'Encounter Set Number'
+            $found.encounter_number = ($encSetNumber -replace '/.*$', '')
+
+            # Copies -> amount (le champ n'existe pas encore sur la carte : on le cree)
+            $copiesValue = [int]$row.Copies
+            if ($found.PSObject.Properties.Name -contains 'amount') {
+                $found.amount = $copiesValue
+            }
+            else {
+                $found | Add-Member -MemberType NoteProperty -Name 'amount' -Value $copiesValue -Force
+            }
+
+            $matchedCount++
+        }
+        else {
+            $unmatchedRows.Add($row) | Out-Null
         }
     }
-
-    if ($found) {
-        # Card Number -> project_number (entier)
-        $found.project_number = [int]$row.'Card Number'
-
-        # Encounter Set Number -> encounter_number, SANS le total "/z"
-        $encSetNumber = [string]$row.'Encounter Set Number'
-        $found.encounter_number = ($encSetNumber -replace '/.*$', '')
-
-        $matchedCount++
-    }
-    else {
-        $unmatchedRows.Add($row) | Out-Null
+    catch {
+        Write-Warning "Erreur sur la ligne xlsx #$rowIndex (Card Number = '$($row.'Card Number')', Nom = '$($row.'English Card Name')') :"
+        Write-Warning $_.Exception.Message
+        throw
     }
 }
 
