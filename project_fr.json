@@ -5,6 +5,66 @@
     "encounter_sets": {
         "601830d5-3362-46e5-b261-2310f1af2d9f": {
             "name": "Lost Moorings"
+        },
+        "98c45865-f974-40e5-b5b1-a63822c5dda3": {
+            "name": "Going Twice"
+        },
+        "b1e36002-76a8-4bfb-803d-ba6af90dfc7e": {
+            "name": "Private Lives"
+        },
+        "eaf151bb-1e4c-4f83-b1c1-3b90ad1e224f": {
+            "name": "Crumbling Masonry"
+        },
+        "eb17d354-78da-48d3-80c9-193c6a53870e": {
+            "name": "Across Dreadful Waters"
+        },
+        "eaa75c8c-eeb4-404c-8901-344babb96e16": {
+            "name": "Blood From Stones"
+        },
+        "8534b166-b926-4d34-b4e1-c36cd66dab0b": {
+            "name": "Pyroclastic Flow"
+        },
+        "95aa749f-d8a2-4dcd-ba78-aad76482dde3": {
+            "name": "Tomb of Dead Dreams"
+        },
+        "d592c9e5-11ad-4c9a-894f-863d601813b7": {
+            "name": "Archaic Evils"
+        },
+        "c06a4536-a5ea-48b8-b816-9f7d935bb7cc": {
+            "name": "Architects of Chaos"
+        },
+        "45b519ea-2c67-499e-9ba0-dd3cbadacc1d": {
+            "name": "Awakened Madness"
+        },
+        "410afd34-0436-4c14-86b7-da5da6eed15b": {
+            "name": "Countermeasures"
+        },
+        "2678a435-33eb-4254-9910-5f8baeaca2ff": {
+            "name": "Cult of Cthulhu"
+        },
+        "618863e3-4779-4216-9c0a-3700e74bf5d6": {
+            "name": "Deep Dreams"
+        },
+        "a455e211-9a7e-4b3c-ba6a-b8aa94eb86d8": {
+            "name": "Shadowy Agents"
+        },
+        "fdb10e74-bc33-4a5b-8adf-867dd6079384": {
+            "name": "Spawn of R'lyeh"
+        },
+        "5143ba57-7dbb-41ea-9c36-269313ee99aa": {
+            "name": "Storm and Sea"
+        },
+        "75183fb5-28d7-4522-8a0c-15727a5ee811": {
+            "name": "Unfriendly Ports"
+        },
+        "0a678702-d627-4897-acb9-566b01a3c4f4": {
+            "name": "Unnatural Stone"
+        },
+        "dbdf476d-a35c-466e-9dd6-1f10e35e8fc7": {
+            "name": "Grand Compass"
+        },
+        "d3605b31-1f9d-4915-a1b9-7e1f278fdb98": {
+            "name": "Tectonic Upheaval"
         }
     },
     "cards": {
